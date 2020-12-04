@@ -4,12 +4,14 @@ import (
 	pb "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
 	"github.com/envoyproxy/ratelimit/src/config"
 	"golang.org/x/net/context"
+	"time"
 )
 
 // Interface for a time source.
 type TimeSource interface {
 	// @return the current unix time in seconds.
 	UnixNow() int64
+	Sleep(time.Duration)
 }
 
 // Interface for a rand Source for expiration jitter.
@@ -18,6 +20,11 @@ type JitterRandSource interface {
 	Int63() int64
 	// @param seed initializes pseudo-random generator to a deterministic state.
 	Seed(seed int64)
+}
+
+type DoLimitResponse struct {
+	DescriptorStatuses []*pb.RateLimitResponse_DescriptorStatus
+	Sleep time.Duration
 }
 
 // Interface for interacting with a cache backend for rate limiting.
@@ -34,5 +41,5 @@ type RateLimitCache interface {
 	DoLimit(
 		ctx context.Context,
 		request *pb.RateLimitRequest,
-		limits []*config.RateLimit) []*pb.RateLimitResponse_DescriptorStatus
+		limits []*config.RateLimit) *DoLimitResponse
 }

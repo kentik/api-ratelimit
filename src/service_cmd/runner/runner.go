@@ -61,18 +61,21 @@ func (runner *Runner) Run() {
 
 	srv := server.NewServer("ratelimit", runner.statsStore, localCache, settings.GrpcUnaryInterceptor(nil))
 
+	timeSource := limiter.NewTimeSourceImpl()
+
 	service := ratelimit.NewService(
 		srv.Runtime(),
 		redis.NewRateLimiterCacheImplFromSettings(
 			s,
 			localCache,
 			srv,
-			limiter.NewTimeSourceImpl(),
+			timeSource,
 			rand.New(limiter.NewLockedSource(time.Now().Unix())),
 			s.ExpirationJitterMaxSeconds),
 		config.NewRateLimitConfigLoaderImpl(),
 		srv.Scope().Scope("service"),
 		s.RuntimeWatchRoot,
+		timeSource,
 	)
 
 	srv.AddDebugHttpEndpoint(

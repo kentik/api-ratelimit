@@ -14,6 +14,9 @@ import (
 	stats "github.com/lyft/gostats"
 	logger "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"golang.org/x/sync/semaphore"
+	"os"
+	"strconv"
 )
 
 type shouldRateLimitStats struct {
@@ -59,6 +62,8 @@ type service struct {
 	rlStatsScope       stats.Scope
 	legacy             *legacyService
 	runtimeWatchRoot   bool
+	timeSource         limiter.TimeSource
+	sleeperSemaphore   *semaphore.Weighted
 }
 
 func (this *service) reloadConfig() {
@@ -138,7 +143,19 @@ func (this *service) shouldRateLimitWorker(
 		}
 	}
 
-	responseDescriptorStatuses := this.cache.DoLimit(ctx, request, limitsToCheck)
+	doLimitResponse := this.cache.DoLimit(ctx, request, limitsToCheck)
+	if doLimitResponse.Sleep > 0 {
+		sem := this.sleeperSemaphore
+		if sem != nil {
+			if sem.TryAcquire(1) {
+				defer sem.Release(1)
+				logger.Warnf("near limit, sleeping %v", doLimitResponse.Sleep)
+				this.timeSource.Sleep(doLimitResponse.Sleep)
+			}
+		}
+	}
+
+	responseDescriptorStatuses := doLimitResponse.DescriptorStatuses
 	assert.Assert(len(limitsToCheck) == len(responseDescriptorStatuses))
 
 	response := &pb.RateLimitResponse{}
@@ -183,6 +200,8 @@ func (this *service) ShouldRateLimit(
 		}
 	}()
 
+	logger.Infof("domain: %s descriptors: %+v", request.GetDomain(), request.GetDescriptors())
+
 	response := this.shouldRateLimitWorker(ctx, request)
 	logger.Debugf("returning normal response")
 	return response, nil
@@ -199,7 +218,8 @@ func (this *service) GetCurrentConfig() config.RateLimitConfig {
 }
 
 func NewService(runtime loader.IFace, cache limiter.RateLimitCache,
-	configLoader config.RateLimitConfigLoader, stats stats.Scope, runtimeWatchRoot bool) RateLimitServiceServer {
+	configLoader config.RateLimitConfigLoader, stats stats.Scope, runtimeWatchRoot bool,
+	timeSource limiter.TimeSource) RateLimitServiceServer {
 
 	newService := &service{
 		runtime:            runtime,
@@ -211,6 +231,8 @@ func NewService(runtime loader.IFace, cache limiter.RateLimitCache,
 		stats:              newServiceStats(stats),
 		rlStatsScope:       stats.Scope("rate_limit"),
 		runtimeWatchRoot:   runtimeWatchRoot,
+		timeSource:         timeSource,
+		sleeperSemaphore:   nil, // no sleeping by default
 	}
 	newService.legacy = &legacyService{
 		s:                          newService,
@@ -219,7 +241,14 @@ func NewService(runtime loader.IFace, cache limiter.RateLimitCache,
 
 	runtime.AddUpdateCallback(newService.runtimeUpdateEvent)
 
+	if s, ok := os.LookupEnv("MAX_SLEEPING_ROUTINES"); ok {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			newService.sleeperSemaphore = semaphore.NewWeighted(int64(v))
+		}
+	}
+
 	newService.reloadConfig()
+
 	go func() {
 		// No exit right now.
 		for {

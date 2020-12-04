@@ -3,6 +3,7 @@ package redis
 import (
 	"math"
 	"math/rand"
+	"time"
 
 	"github.com/coocood/freecache"
 	pb "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
@@ -45,7 +46,7 @@ func pipelineAppend(client Client, pipeline *Pipeline, key string, hitsAddend ui
 func (this *fixedRateLimitCacheImpl) DoLimit(
 	ctx context.Context,
 	request *pb.RateLimitRequest,
-	limits []*config.RateLimit) []*pb.RateLimitResponse_DescriptorStatus {
+	limits []*config.RateLimit) *limiter.DoLimitResponse {
 
 	logger.Debugf("starting cache lookup")
 
@@ -117,11 +118,13 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 	}
 
 	// Now fetch the pipeline.
-	responseDescriptorStatuses := make([]*pb.RateLimitResponse_DescriptorStatus,
-		len(request.Descriptors))
+	response := &limiter.DoLimitResponse{
+		DescriptorStatuses: make([]*pb.RateLimitResponse_DescriptorStatus, len(request.Descriptors)),
+	}
+
 	for i, cacheKey := range cacheKeys {
 		if cacheKey.Key == "" {
-			responseDescriptorStatuses[i] =
+			response.DescriptorStatuses[i] =
 				&pb.RateLimitResponse_DescriptorStatus{
 					Code:           pb.RateLimitResponse_OK,
 					CurrentLimit:   nil,
@@ -131,7 +134,7 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 		}
 
 		if isOverLimitWithLocalCache[i] {
-			responseDescriptorStatuses[i] =
+			response.DescriptorStatuses[i] =
 				&pb.RateLimitResponse_DescriptorStatus{
 					Code:               pb.RateLimitResponse_OVER_LIMIT,
 					CurrentLimit:       limits[i].Limit,
@@ -152,7 +155,7 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 
 		logger.Debugf("cache key: %s current: %d", cacheKey.Key, limitAfterIncrease)
 		if limitAfterIncrease > overLimitThreshold {
-			responseDescriptorStatuses[i] =
+			response.DescriptorStatuses[i] =
 				&pb.RateLimitResponse_DescriptorStatus{
 					Code:               pb.RateLimitResponse_OVER_LIMIT,
 					CurrentLimit:       limits[i].Limit,
@@ -188,16 +191,27 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 				}
 			}
 		} else {
-			responseDescriptorStatuses[i] =
+			remaining := overLimitThreshold - limitAfterIncrease
+			response.DescriptorStatuses[i] =
 				&pb.RateLimitResponse_DescriptorStatus{
 					Code:               pb.RateLimitResponse_OK,
 					CurrentLimit:       limits[i].Limit,
-					LimitRemaining:     overLimitThreshold - limitAfterIncrease,
+					LimitRemaining:     remaining,
 					DurationUntilReset: CalculateReset(limits[i].Limit, this.timeSource),
 				}
 
 			// The limit is OK but we additionally want to know if we are near the limit.
 			if limitAfterIncrease > nearLimitThreshold {
+				// sleep so that the caller doesn't hit our rate limit
+				divider := utils.UnitToDivider(limits[i].Limit.Unit)
+				end := (now/divider)*divider + divider
+				millisRemaining := uint32(end-now) * 1000
+				callsRemaining := max(overLimitThreshold-limitAfterIncrease, 1)
+				sleep := time.Duration(millisRemaining/callsRemaining) * time.Millisecond
+				if sleep > response.Sleep {
+					response.Sleep = sleep
+				}
+
 				// Here we also need to assess which portion of the hitsAddend were in the near limit range.
 				// If all the hits were over the nearLimitThreshold, then all hits are near limit. Otherwise,
 				// only the difference between the current limit value and the near limit threshold were near
@@ -211,7 +225,7 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 		}
 	}
 
-	return responseDescriptorStatuses
+	return response
 }
 
 func CalculateReset(currentLimit *pb.RateLimitResponse_RateLimit, timeSource limiter.TimeSource) *duration.Duration {

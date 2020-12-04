@@ -16,6 +16,11 @@ func (this *timeSourceImpl) UnixNow() int64 {
 	return time.Now().Unix()
 }
 
+func (this *timeSourceImpl) Sleep(d time.Duration) {
+	time.Sleep(d)
+}
+
+
 // rand for jitter.
 type lockedSource struct {
 	lk  sync.Mutex
