@@ -1,4 +1,4 @@
-name: ratelimit
+name: api-ratelimit
 description: Kentik envoy rate limiter fork
 version: TAG
 target:
