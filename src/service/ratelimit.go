@@ -1,9 +1,13 @@
 package ratelimit
 
 import (
+	"encoding/json"
 	"fmt"
+	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	"github.com/envoyproxy/ratelimit/src/utils"
 	"strings"
 	"sync"
+	"time"
 
 	pb "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
 	"github.com/envoyproxy/ratelimit/src/assert"
@@ -64,6 +68,8 @@ type service struct {
 	runtimeWatchRoot   bool
 	timeSource         limiter.TimeSource
 	sleeperSemaphore   *semaphore.Weighted
+
+	sampler utils.Sampler
 }
 
 func (this *service) reloadConfig() {
@@ -167,8 +173,23 @@ func (this *service) shouldRateLimitWorker(
 			finalCode = descriptorStatus.Code
 		}
 	}
-
 	response.OverallCode = finalCode
+
+	if finalCode != pb.RateLimitResponse_OK || doLimitResponse.Sleep > 0 {
+		if this.sampler.Sample() {
+			if status, err := json.Marshal(doLimitResponse.DescriptorStatuses); err != nil {
+				logger.Warn("could not marshal doLimitResponse.DescriptorStatuses: %v", err)
+			} else {
+				header := &envoy_config_core_v3.HeaderValue{
+					Key:   "x-ratelimit-status",
+					Value: string(status),
+				}
+				response.ResponseHeadersToAdd = append(response.ResponseHeadersToAdd, header)
+				response.RequestHeadersToAdd = append(response.RequestHeadersToAdd, header)
+			}
+		}
+	}
+
 	return response
 }
 
@@ -233,6 +254,11 @@ func NewService(runtime loader.IFace, cache limiter.RateLimitCache,
 		runtimeWatchRoot:   runtimeWatchRoot,
 		timeSource:         timeSource,
 		sleeperSemaphore:   nil, // no sleeping by default
+		sampler: &utils.BurstSampler{
+			Burst:       100,
+			Period:      time.Second,
+			NextSampler: utils.Sometimes,
+		},
 	}
 	newService.legacy = &legacyService{
 		s:                          newService,
