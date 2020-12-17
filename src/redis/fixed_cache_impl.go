@@ -1,10 +1,6 @@
 package redis
 
 import (
-	"math"
-	"math/rand"
-	"time"
-
 	"github.com/coocood/freecache"
 	pb "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
 	"github.com/envoyproxy/ratelimit/src/assert"
@@ -14,6 +10,8 @@ import (
 	"github.com/golang/protobuf/ptypes/duration"
 	logger "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"math"
+	"math/rand"
 )
 
 type fixedRateLimitCacheImpl struct {
@@ -123,6 +121,11 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 	}
 
 	for i, cacheKey := range cacheKeys {
+		// we'll report details if any limit descriptor has this enabled
+		if !response.ReportDetails {
+			response.ReportDetails = limits[i].ReportDetails
+		}
+
 		if cacheKey.Key == "" {
 			response.DescriptorStatuses[i] =
 				&pb.RateLimitResponse_DescriptorStatus{
@@ -207,9 +210,11 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 				end := (now/divider)*divider + divider
 				millisRemaining := uint32(end-now) * 1000
 				callsRemaining := max(overLimitThreshold-limitAfterIncrease, 1)
-				sleep := time.Duration(millisRemaining/callsRemaining) * time.Millisecond
-				if sleep > response.Sleep {
-					response.Sleep = sleep
+				throttleMillis := millisRemaining / callsRemaining
+				if throttleMillis > response.ThrottleMillis {
+					response.ThrottleMillis = throttleMillis
+					response.ReportDetails = limits[i].ReportDetails
+					response.SleepOnThrottle = limits[i].SleepOnThrottle
 				}
 
 				// Here we also need to assess which portion of the hitsAddend were in the near limit range.

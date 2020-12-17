@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -69,7 +70,7 @@ type service struct {
 	timeSource         limiter.TimeSource
 	sleeperSemaphore   *semaphore.Weighted
 
-	sampler utils.Sampler
+	reportDetailSampler utils.Sampler
 }
 
 func (this *service) reloadConfig() {
@@ -150,13 +151,15 @@ func (this *service) shouldRateLimitWorker(
 	}
 
 	doLimitResponse := this.cache.DoLimit(ctx, request, limitsToCheck)
-	if doLimitResponse.Sleep > 0 {
+
+	if doLimitResponse.SleepOnThrottle && doLimitResponse.ThrottleMillis > 0 {
 		sem := this.sleeperSemaphore
 		if sem != nil {
 			if sem.TryAcquire(1) {
 				defer sem.Release(1)
-				logger.Warnf("near limit, sleeping %v", doLimitResponse.Sleep)
-				this.timeSource.Sleep(doLimitResponse.Sleep)
+				logger.Warnf("near limit, sleeping %d", doLimitResponse.ThrottleMillis)
+				this.timeSource.Sleep(time.Duration(doLimitResponse.ThrottleMillis) * time.Millisecond)
+				doLimitResponse.ThrottleMillis = 0 // we throttle on the server side by sleeping, so reset this
 			}
 		}
 	}
@@ -175,19 +178,23 @@ func (this *service) shouldRateLimitWorker(
 	}
 	response.OverallCode = finalCode
 
-	if finalCode != pb.RateLimitResponse_OK || doLimitResponse.Sleep > 0 {
-		if this.sampler.Sample() {
-			if status, err := json.Marshal(doLimitResponse.DescriptorStatuses); err != nil {
-				logger.Warn("could not marshal doLimitResponse.DescriptorStatuses: %v", err)
-			} else {
-				header := &envoy_config_core_v3.HeaderValue{
-					Key:   "x-ratelimit-status",
-					Value: string(status),
-				}
-				response.ResponseHeadersToAdd = append(response.ResponseHeadersToAdd, header)
-				response.RequestHeadersToAdd = append(response.RequestHeadersToAdd, header)
+	if doLimitResponse.ReportDetails && this.reportDetailSampler.Sample() {
+		if status, err := json.Marshal(doLimitResponse); err == nil {
+			encodedStatus := base64.RawURLEncoding.EncodeToString(status)
+			header := &envoy_config_core_v3.HeaderValue{
+				Key:   "x-ratelimit-details",
+				Value: encodedStatus,
 			}
+			response.ResponseHeadersToAdd = append(response.ResponseHeadersToAdd, header)
 		}
+	}
+
+	if doLimitResponse.ThrottleMillis > 0 {
+		header := &envoy_config_core_v3.HeaderValue{
+			Key:   "x-ratelimit-throttle-ms",
+			Value: strconv.FormatInt(int64(doLimitResponse.ThrottleMillis), 10),
+		}
+		response.ResponseHeadersToAdd = append(response.ResponseHeadersToAdd, header)
 	}
 
 	return response
@@ -203,7 +210,7 @@ func (this *service) ShouldRateLimit(
 			return
 		}
 
-		logger.Debugf("caught error during call")
+		logger.Debugf("caught error during call: %+v", err)
 		finalResponse = nil
 		switch t := err.(type) {
 		case redis.RedisError:
@@ -221,10 +228,9 @@ func (this *service) ShouldRateLimit(
 		}
 	}()
 
-	logger.Infof("domain: %s descriptors: %+v", request.GetDomain(), request.GetDescriptors())
-
+	logger.Debugf("domain: %s descriptors: %+v", request.GetDomain(), request.GetDescriptors())
 	response := this.shouldRateLimitWorker(ctx, request)
-	logger.Debugf("returning normal response")
+	logger.Debugf("returning normal response: %+v", response)
 	return response, nil
 }
 
@@ -254,7 +260,7 @@ func NewService(runtime loader.IFace, cache limiter.RateLimitCache,
 		runtimeWatchRoot:   runtimeWatchRoot,
 		timeSource:         timeSource,
 		sleeperSemaphore:   nil, // no sleeping by default
-		sampler: &utils.BurstSampler{
+		reportDetailSampler: &utils.BurstSampler{
 			Burst:       100,
 			Period:      time.Second,
 			NextSampler: utils.Sometimes,
