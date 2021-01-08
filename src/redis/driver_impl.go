@@ -54,7 +54,7 @@ func checkError(err error) {
 
 func NewClientImpl(scope stats.Scope, useTls bool, auth string, redisType string, url string, poolSize int,
 	pipelineWindow time.Duration, pipelineLimit int) Client {
-	logger.Warnf("connecting to redis on %s with pool size %d", url, poolSize)
+	logger.Warnf("connecting to redis with pool size %d", poolSize)
 
 	df := func(network, addr string) (radix.Conn, error) {
 		var dialOpts []radix.DialOpt
