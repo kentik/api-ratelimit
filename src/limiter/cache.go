@@ -24,9 +24,9 @@ type JitterRandSource interface {
 
 type DoLimitResponse struct {
 	DescriptorStatuses []*pb.RateLimitResponse_DescriptorStatus `json:"descriptor_statuses"`
-	ThrottleMillis     uint32 `json:"-"`
-	ReportDetails      bool   `json:"-"`
-	SleepOnThrottle    bool   `json:"-"`
+	ThrottleMillis     uint32                                   `json:"-"`
+	ReportDetails      bool                                     `json:"-"`
+	SleepOnThrottle    bool                                     `json:"-"`
 }
 
 // Interface for interacting with a cache backend for rate limiting.

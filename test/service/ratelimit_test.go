@@ -130,8 +130,8 @@ func TestService(test *testing.T) {
 	t.cache.EXPECT().DoLimit(nil, request, limits).Return(
 		&limiter.DoLimitResponse{
 			[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[0].Limit, LimitRemaining: 0},
-			{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}},
-		0, false, false})
+				{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}},
+			0, false, false})
 	response, err = service.ShouldRateLimit(nil, request)
 	common.AssertProtoEqual(
 		t.assert,
@@ -164,7 +164,7 @@ func TestService(test *testing.T) {
 		&limiter.DoLimitResponse{
 			[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0},
 				{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[1].Limit, LimitRemaining: 0}},
-				0, false, false,
+			0, false, false,
 		})
 	response, err = service.ShouldRateLimit(nil, request)
 	common.AssertProtoEqual(
