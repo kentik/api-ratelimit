@@ -189,7 +189,7 @@ func (this *service) shouldRateLimitWorker(
 		}
 	}
 
-	if doLimitResponse.ThrottleMillis > 0 {
+	if doLimitResponse.ReportDetails && doLimitResponse.ThrottleMillis > 0 {
 		header := &envoy_config_core_v3.HeaderValue{
 			Key:   "x-ratelimit-throttle-ms",
 			Value: strconv.FormatInt(int64(doLimitResponse.ThrottleMillis), 10),

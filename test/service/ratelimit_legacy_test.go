@@ -1,6 +1,7 @@
 package ratelimit_test
 
 import (
+	"github.com/envoyproxy/ratelimit/src/limiter"
 	"testing"
 
 	core_legacy "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
@@ -65,7 +66,10 @@ func TestServiceLegacy(test *testing.T) {
 	}
 	t.config.EXPECT().GetLimit(nil, "test-domain", req.Descriptors[0]).Return(nil)
 	t.cache.EXPECT().DoLimit(nil, req, []*config.RateLimit{nil}).Return(
-		[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}})
+		&limiter.DoLimitResponse{
+			[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}},
+			0, false, false,
+		})
 
 	response, err := service.GetLegacyService().ShouldRateLimit(nil, legacyRequest)
 	common.AssertProtoEqual(
@@ -103,8 +107,10 @@ func TestServiceLegacy(test *testing.T) {
 	t.config.EXPECT().GetLimit(nil, "different-domain", req.Descriptors[0]).Return(limits[0])
 	t.config.EXPECT().GetLimit(nil, "different-domain", req.Descriptors[1]).Return(limits[1])
 	t.cache.EXPECT().DoLimit(nil, req, limits).Return(
-		[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[0].Limit, LimitRemaining: 0},
-			{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}})
+		&limiter.DoLimitResponse{
+			[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[0].Limit, LimitRemaining: 0},
+				{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}},
+			0, false, false})
 	response, err = service.GetLegacyService().ShouldRateLimit(nil, legacyRequest)
 	common.AssertProtoEqual(
 		t.assert,
@@ -139,8 +145,11 @@ func TestServiceLegacy(test *testing.T) {
 	t.config.EXPECT().GetLimit(nil, "different-domain", req.Descriptors[0]).Return(limits[0])
 	t.config.EXPECT().GetLimit(nil, "different-domain", req.Descriptors[1]).Return(limits[1])
 	t.cache.EXPECT().DoLimit(nil, req, limits).Return(
-		[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0},
-			{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[1].Limit, LimitRemaining: 0}})
+		&limiter.DoLimitResponse{
+			[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0},
+				{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[1].Limit, LimitRemaining: 0}},
+			0, false, false,
+		})
 	response, err = service.GetLegacyService().ShouldRateLimit(nil, legacyRequest)
 	common.AssertProtoEqual(
 		t.assert,
