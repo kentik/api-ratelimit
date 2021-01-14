@@ -123,7 +123,9 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 	for i, cacheKey := range cacheKeys {
 		// we'll report details if any limit descriptor has this enabled
 		if !response.ReportDetails {
-			response.ReportDetails = limits[i].ReportDetails
+			if limits[i] != nil {
+				response.ReportDetails = limits[i].ReportDetails
+			}
 		}
 
 		if cacheKey.Key == "" {
