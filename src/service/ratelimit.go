@@ -1,9 +1,14 @@
 package ratelimit
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	"github.com/envoyproxy/ratelimit/src/utils"
 	"strings"
 	"sync"
+	"time"
 
 	pb "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
 	"github.com/envoyproxy/ratelimit/src/assert"
@@ -14,6 +19,9 @@ import (
 	stats "github.com/lyft/gostats"
 	logger "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"golang.org/x/sync/semaphore"
+	"os"
+	"strconv"
 )
 
 type shouldRateLimitStats struct {
@@ -59,6 +67,10 @@ type service struct {
 	rlStatsScope       stats.Scope
 	legacy             *legacyService
 	runtimeWatchRoot   bool
+	timeSource         utils.TimeSource
+	sleeperSemaphore   *semaphore.Weighted
+
+	reportDetailSampler utils.Sampler
 }
 
 func (this *service) reloadConfig() {
@@ -112,6 +124,8 @@ func (this *service) shouldRateLimitWorker(
 	snappedConfig := this.GetCurrentConfig()
 	checkServiceErr(snappedConfig != nil, "no rate limit configuration loaded")
 
+	sleepOnThrottle := false
+	reportDetails := false
 	limitsToCheck := make([]*config.RateLimit, len(request.Descriptors))
 	for i, descriptor := range request.Descriptors {
 		if logger.IsLevelEnabled(logger.DebugLevel) {
@@ -136,22 +150,62 @@ func (this *service) shouldRateLimitWorker(
 				)
 			}
 		}
+		if limitsToCheck[i] != nil {
+			if !sleepOnThrottle {
+				sleepOnThrottle = limitsToCheck[i].SleepOnThrottle
+			}
+			if !reportDetails {
+				reportDetails = limitsToCheck[i].ReportDetails
+			}
+		}
 	}
 
-	responseDescriptorStatuses := this.cache.DoLimit(ctx, request, limitsToCheck)
-	assert.Assert(len(limitsToCheck) == len(responseDescriptorStatuses))
+	doLimitResponse := this.cache.DoLimit(ctx, request, limitsToCheck)
+	assert.Assert(len(limitsToCheck) == len(doLimitResponse.DescriptorStatuses))
+
+	if sleepOnThrottle && doLimitResponse.ThrottleMillis > 0 {
+		sem := this.sleeperSemaphore
+		if sem != nil {
+			if sem.TryAcquire(1) {
+				defer sem.Release(1)
+				logger.Warnf("near limit, sleeping %d", doLimitResponse.ThrottleMillis)
+				this.timeSource.Sleep(time.Duration(doLimitResponse.ThrottleMillis) * time.Millisecond)
+				doLimitResponse.ThrottleMillis = 0 // we throttle on the server side by sleeping, so reset this
+			}
+		}
+	}
 
 	response := &pb.RateLimitResponse{}
 	response.Statuses = make([]*pb.RateLimitResponse_DescriptorStatus, len(request.Descriptors))
 	finalCode := pb.RateLimitResponse_OK
-	for i, descriptorStatus := range responseDescriptorStatuses {
+	for i, descriptorStatus := range doLimitResponse.DescriptorStatuses {
 		response.Statuses[i] = descriptorStatus
 		if descriptorStatus.Code == pb.RateLimitResponse_OVER_LIMIT {
 			finalCode = descriptorStatus.Code
 		}
 	}
-
 	response.OverallCode = finalCode
+
+	if reportDetails {
+		if this.reportDetailSampler.Sample() {
+			if status, err := json.Marshal(doLimitResponse); err == nil {
+				encodedStatus := base64.RawURLEncoding.EncodeToString(status)
+				header := &envoy_config_core_v3.HeaderValue{
+					Key:   "x-ratelimit-details",
+					Value: encodedStatus,
+				}
+				response.ResponseHeadersToAdd = append(response.ResponseHeadersToAdd, header)
+			}
+		}
+		if doLimitResponse.ThrottleMillis > 0 {
+			header := &envoy_config_core_v3.HeaderValue{
+				Key:   "x-ratelimit-throttle-ms",
+				Value: strconv.FormatInt(int64(doLimitResponse.ThrottleMillis), 10),
+			}
+			response.ResponseHeadersToAdd = append(response.ResponseHeadersToAdd, header)
+		}
+	}
+
 	return response
 }
 
@@ -165,7 +219,7 @@ func (this *service) ShouldRateLimit(
 			return
 		}
 
-		logger.Debugf("caught error during call")
+		logger.Debugf("caught error during call: %+v", err)
 		finalResponse = nil
 		switch t := err.(type) {
 		case redis.RedisError:
@@ -183,8 +237,9 @@ func (this *service) ShouldRateLimit(
 		}
 	}()
 
+	logger.Debugf("domain: %s descriptors: %+v", request.GetDomain(), request.GetDescriptors())
 	response := this.shouldRateLimitWorker(ctx, request)
-	logger.Debugf("returning normal response")
+	logger.Debugf("returning normal response: %+v", response)
 	return response, nil
 }
 
@@ -199,7 +254,8 @@ func (this *service) GetCurrentConfig() config.RateLimitConfig {
 }
 
 func NewService(runtime loader.IFace, cache limiter.RateLimitCache,
-	configLoader config.RateLimitConfigLoader, stats stats.Scope, runtimeWatchRoot bool) RateLimitServiceServer {
+	configLoader config.RateLimitConfigLoader, stats stats.Scope, runtimeWatchRoot bool,
+	timeSource utils.TimeSource) RateLimitServiceServer {
 
 	newService := &service{
 		runtime:            runtime,
@@ -211,6 +267,13 @@ func NewService(runtime loader.IFace, cache limiter.RateLimitCache,
 		stats:              newServiceStats(stats),
 		rlStatsScope:       stats.Scope("rate_limit"),
 		runtimeWatchRoot:   runtimeWatchRoot,
+		timeSource:         timeSource,
+		sleeperSemaphore:   nil, // no sleeping by default
+		reportDetailSampler: &utils.BurstSampler{
+			Burst:       100,
+			Period:      time.Second,
+			NextSampler: utils.Sometimes,
+		},
 	}
 	newService.legacy = &legacyService{
 		s:                          newService,
@@ -219,7 +282,14 @@ func NewService(runtime loader.IFace, cache limiter.RateLimitCache,
 
 	runtime.AddUpdateCallback(newService.runtimeUpdateEvent)
 
+	if s, ok := os.LookupEnv("MAX_SLEEPING_ROUTINES"); ok {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			newService.sleeperSemaphore = semaphore.NewWeighted(int64(v))
+		}
+	}
+
 	newService.reloadConfig()
+
 	go func() {
 		// No exit right now.
 		for {

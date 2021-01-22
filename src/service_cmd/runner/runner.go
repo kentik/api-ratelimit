@@ -37,20 +37,20 @@ func (runner *Runner) GetStatsStore() stats.Store {
 	return runner.statsStore
 }
 
-func createLimiter(srv server.Server, s settings.Settings, localCache *freecache.Cache) limiter.RateLimitCache {
+func createLimiter(srv server.Server, s settings.Settings, localCache *freecache.Cache, timeSource utils.TimeSource) limiter.RateLimitCache {
 	switch s.BackendType {
 	case "redis", "":
 		return redis.NewRateLimiterCacheImplFromSettings(
 			s,
 			localCache,
 			srv,
-			utils.NewTimeSourceImpl(),
+			timeSource,
 			rand.New(utils.NewLockedSource(time.Now().Unix())),
 			s.ExpirationJitterMaxSeconds)
 	case "memcache":
 		return memcached.NewRateLimitCacheImplFromSettings(
 			s,
-			utils.NewTimeSourceImpl(),
+			timeSource,
 			rand.New(utils.NewLockedSource(time.Now().Unix())),
 			localCache,
 			srv.Scope())
@@ -86,12 +86,15 @@ func (runner *Runner) Run() {
 
 	srv := server.NewServer("ratelimit", runner.statsStore, localCache, settings.GrpcUnaryInterceptor(nil))
 
+	timeSource := utils.NewTimeSourceImpl()
+
 	service := ratelimit.NewService(
 		srv.Runtime(),
-		createLimiter(srv, s, localCache),
+		createLimiter(srv, s, localCache, timeSource),
 		config.NewRateLimitConfigLoaderImpl(),
 		srv.Scope().Scope("service"),
 		s.RuntimeWatchRoot,
+		timeSource,
 	)
 
 	srv.AddDebugHttpEndpoint(
