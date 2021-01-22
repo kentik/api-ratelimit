@@ -6,6 +6,11 @@ import (
 	"golang.org/x/net/context"
 )
 
+type DoLimitResponse struct {
+	DescriptorStatuses []*pb.RateLimitResponse_DescriptorStatus `json:"descriptor_statuses"`
+	ThrottleMillis     uint32                                   `json:"-"`
+}
+
 // Interface for interacting with a cache backend for rate limiting.
 type RateLimitCache interface {
 	// Contact the cache and perform rate limiting for a set of descriptors and limits.
@@ -20,7 +25,7 @@ type RateLimitCache interface {
 	DoLimit(
 		ctx context.Context,
 		request *pb.RateLimitRequest,
-		limits []*config.RateLimit) []*pb.RateLimitResponse_DescriptorStatus
+		limits []*config.RateLimit) *DoLimitResponse
 
 	// Waits for any unfinished asynchronous work. This may be used by unit tests,
 	// since the memcache cache does increments in a background gorountine.
