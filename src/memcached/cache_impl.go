@@ -53,7 +53,7 @@ var _ limiter.RateLimitCache = (*rateLimitMemcacheImpl)(nil)
 func (this *rateLimitMemcacheImpl) DoLimit(
 	ctx context.Context,
 	request *pb.RateLimitRequest,
-	limits []*config.RateLimit) []*pb.RateLimitResponse_DescriptorStatus {
+	limits []*config.RateLimit) *limiter.DoLimitResponse {
 
 	logger.Debugf("starting cache lookup")
 
@@ -84,8 +84,10 @@ func (this *rateLimitMemcacheImpl) DoLimit(
 	}
 
 	// Now fetch from memcache.
-	responseDescriptorStatuses := make([]*pb.RateLimitResponse_DescriptorStatus,
-		len(request.Descriptors))
+	response := &limiter.DoLimitResponse{
+		DescriptorStatuses: make([]*pb.RateLimitResponse_DescriptorStatus,
+			len(request.Descriptors)),
+	}
 
 	var memcacheValues map[string]*memcache.Item
 	var err error
@@ -122,7 +124,7 @@ func (this *rateLimitMemcacheImpl) DoLimit(
 	this.waitGroup.Add(1)
 	go this.increaseAsync(cacheKeys, isOverLimitWithLocalCache, limits, uint64(hitsAddend))
 
-	return responseDescriptorStatuses
+	return response
 }
 
 func (this *rateLimitMemcacheImpl) increaseAsync(cacheKeys []limiter.CacheKey, isOverLimitWithLocalCache []bool,
