@@ -30,7 +30,7 @@ func pipelineAppend(client Client, pipeline *Pipeline, key string, hitsAddend ui
 func (this *fixedRateLimitCacheImpl) DoLimit(
 	ctx context.Context,
 	request *pb.RateLimitRequest,
-	limits []*config.RateLimit) []*pb.RateLimitResponse_DescriptorStatus {
+	limits []*config.RateLimit) *limiter.DoLimitResponse {
 
 	logger.Debugf("starting cache lookup")
 
@@ -86,8 +86,9 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 	}
 
 	// Now fetch the pipeline.
-	responseDescriptorStatuses := make([]*pb.RateLimitResponse_DescriptorStatus,
-		len(request.Descriptors))
+	response := &limiter.DoLimitResponse{
+		DescriptorStatuses: make([]*pb.RateLimitResponse_DescriptorStatus, len(request.Descriptors)),
+	}
 	for i, cacheKey := range cacheKeys {
 
 		limitAfterIncrease := results[i]
@@ -100,7 +101,7 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 
 	}
 
-	return responseDescriptorStatuses
+	return response
 }
 
 // Flush() is a no-op with redis since quota reads and updates happen synchronously.
