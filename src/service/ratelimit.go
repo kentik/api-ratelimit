@@ -6,6 +6,9 @@ import (
 	"fmt"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	"github.com/envoyproxy/ratelimit/src/utils"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	otl "github.com/opentracing/opentracing-go/log"
 	"strings"
 	"sync"
 	"time"
@@ -213,10 +216,20 @@ func (this *service) ShouldRateLimit(
 	ctx context.Context,
 	request *pb.RateLimitRequest) (finalResponse *pb.RateLimitResponse, finalError error) {
 
+	span := opentracing.SpanFromContext(ctx)
+
 	defer func() {
 		err := recover()
 		if err == nil {
 			return
+		}
+
+		if span != nil {
+			ext.Error.Set(span, true)
+			span.LogFields(
+				otl.Object("err", err),
+				otl.String("msg", "could not unmarshal message, ignoring (potential data loss)"),
+			)
 		}
 
 		logger.Debugf("caught error during call: %+v", err)

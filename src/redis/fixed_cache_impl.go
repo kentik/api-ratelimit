@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"github.com/opentracing/opentracing-go"
 	"math/rand"
 
 	"github.com/coocood/freecache"
@@ -40,6 +41,12 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 	// First build a list of all cache keys that we are actually going to hit.
 	cacheKeys := this.baseRateLimiter.GenerateCacheKeys(request, limits, hitsAddend)
 
+	span := opentracing.SpanFromContext(ctx)
+	if span != nil {
+		span.SetTag("backend", "redis")
+		span.LogKV("event", "DoLimit.start", "limits_count", len(limits), "cache_keys_count", len(cacheKeys))
+	}
+
 	isOverLimitWithLocalCache := make([]bool, len(request.Descriptors))
 	results := make([]uint32, len(request.Descriptors))
 	var pipeline, perSecondPipeline Pipeline
@@ -78,11 +85,20 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 		}
 	}
 
+	if span != nil {
+		span.LogKV("event", "lookup.start")
+	}
 	if pipeline != nil {
 		checkError(this.client.PipeDo(pipeline))
 	}
+	if span != nil {
+		span.LogKV("event", "redis.lookup.done", "client", "main")
+	}
 	if perSecondPipeline != nil {
 		checkError(this.perSecondClient.PipeDo(perSecondPipeline))
+	}
+	if span != nil {
+		span.LogKV("event", "redis.lookup.done", "client", "per_second")
 	}
 
 	// Now fetch the pipeline.
@@ -100,6 +116,9 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 
 	}
 
+	if span != nil {
+		span.LogKV("event", "DoLimit.returning")
+	}
 	return response
 }
 
