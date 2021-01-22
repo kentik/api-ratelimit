@@ -18,10 +18,12 @@ type yamlRateLimit struct {
 }
 
 type yamlDescriptor struct {
-	Key         string
-	Value       string
-	RateLimit   *yamlRateLimit `yaml:"rate_limit"`
-	Descriptors []yamlDescriptor
+	Key             string
+	Value           string
+	RateLimit       *yamlRateLimit `yaml:"rate_limit"`
+	Descriptors     []yamlDescriptor
+	ReportDetails   bool `yaml:"report_details"`
+	SleepOnThrottle bool `yaml:"sleep_on_throttle"`
 }
 
 type yamlRoot struct {
@@ -51,6 +53,8 @@ var validKeys = map[string]bool{
 	"rate_limit":        true,
 	"unit":              true,
 	"requests_per_unit": true,
+	"sleep_on_throttle": true,
+	"report_details":    true,
 }
 
 // Create new rate limit stats for a config entry.
@@ -73,9 +77,15 @@ func newRateLimitStats(statsScope stats.Scope, key string) RateLimitStats {
 // @param scope supplies the owning scope.
 // @return the new config entry.
 func NewRateLimit(
-	requestsPerUnit uint32, unit pb.RateLimitResponse_RateLimit_Unit, key string, scope stats.Scope) *RateLimit {
+	requestsPerUnit uint32, unit pb.RateLimitResponse_RateLimit_Unit, key string, scope stats.Scope, sleepOnThrottle bool, reportDetails bool) *RateLimit {
 
-	return &RateLimit{FullKey: key, Stats: newRateLimitStats(scope, key), Limit: &pb.RateLimitResponse_RateLimit{RequestsPerUnit: requestsPerUnit, Unit: unit}}
+	return &RateLimit{
+		FullKey:         key,
+		Stats:           newRateLimitStats(scope, key),
+		Limit:           &pb.RateLimitResponse_RateLimit{RequestsPerUnit: requestsPerUnit, Unit: unit},
+		SleepOnThrottle: sleepOnThrottle,
+		ReportDetails:   reportDetails,
+	}
 }
 
 // Dump an individual descriptor for debugging purposes.
@@ -138,7 +148,7 @@ func (this *rateLimitDescriptor) loadDescriptors(
 
 			rateLimit = NewRateLimit(
 				descriptorConfig.RateLimit.RequestsPerUnit, pb.RateLimitResponse_RateLimit_Unit(value), newParentKey,
-				statsScope)
+				statsScope, descriptorConfig.SleepOnThrottle, descriptorConfig.ReportDetails)
 			rateLimitDebugString = fmt.Sprintf(
 				" ratelimit={requests_per_unit=%d, unit=%s}", rateLimit.Limit.RequestsPerUnit,
 				rateLimit.Limit.Unit.String())
@@ -184,6 +194,8 @@ func validateYamlKeys(config RateLimitConfigToLoad, config_map map[interface{}]i
 		// string is a leaf type in ratelimit config. No need to keep validating.
 		case string:
 		// int is a leaf type in ratelimit config. No need to keep validating.
+		case bool:
+		// bool is a leaf type in ratelimit config. No need to keep validating.
 		case int:
 		// nil case is an incorrectly formed yaml. However, because this function's purpose is to validate
 		// the yaml's keys we don't panic here.
@@ -273,7 +285,7 @@ func (this *rateLimitConfigImpl) GetLimit(
 			descriptor.GetLimit().GetRequestsPerUnit(),
 			rateLimitOverrideUnit,
 			rateLimitKey,
-			this.statsScope)
+			this.statsScope, false, false)
 		return rateLimit
 	}
 
