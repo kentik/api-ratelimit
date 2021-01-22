@@ -1,6 +1,8 @@
 package runner
 
 import (
+	"github.com/envoyproxy/ratelimit/src/tracing"
+	grpcopentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"io"
 	"math/rand"
 	"net/http"
@@ -84,7 +86,10 @@ func (runner *Runner) Run() {
 		localCache = freecache.NewCache(s.LocalCacheSizeInBytes)
 	}
 
-	srv := server.NewServer("ratelimit", runner.statsStore, localCache, settings.GrpcUnaryInterceptor(nil))
+	lightstep := tracing.NewLightstepTracer(tracing.GetLightstepConfigFromEnv(), "1.0")
+	defer lightstep.Close()
+	
+	srv := server.NewServer("ratelimit", runner.statsStore, localCache, settings.GrpcUnaryInterceptor(grpcopentracing.UnaryServerInterceptor()))
 
 	timeSource := utils.NewTimeSourceImpl()
 
