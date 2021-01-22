@@ -201,7 +201,7 @@ func validateYamlKeys(config RateLimitConfigToLoad, config_map map[interface{}]i
 		// the yaml's keys we don't panic here.
 		case nil:
 		default:
-			errorText := fmt.Sprintf("error checking config")
+			errorText := fmt.Sprintf("error checking config: %+v", v)
 			logger.Debugf(errorText)
 			panic(newRateLimitConfigError(config, errorText))
 		}
