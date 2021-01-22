@@ -121,6 +121,14 @@ func checkServiceErr(something bool, msg string) {
 func (this *service) shouldRateLimitWorker(
 	ctx context.Context, request *pb.RateLimitRequest) *pb.RateLimitResponse {
 
+	response := &pb.RateLimitResponse{}
+
+	span := opentracing.SpanFromContext(ctx)
+	if span != nil {
+		span.LogFields(otl.String("event",  "shouldRateLimitWorker.start"))
+		defer span.LogFields(otl.String("event", "shouldRateLimitWorker.done"), otl.Int32("response.code", int32(response.OverallCode)))
+	}
+
 	checkServiceErr(request.Domain != "", "rate limit domain must not be empty")
 	checkServiceErr(len(request.Descriptors) != 0, "rate limit descriptor list must not be empty")
 
@@ -170,15 +178,21 @@ func (this *service) shouldRateLimitWorker(
 		sem := this.sleeperSemaphore
 		if sem != nil {
 			if sem.TryAcquire(1) {
-				defer sem.Release(1)
-				logger.Warnf("near limit, sleeping %d", doLimitResponse.ThrottleMillis)
+				if span != nil {
+					span.LogFields(otl.String("event", "throttling.sleep"), otl.Uint32("sleep_ms", doLimitResponse.ThrottleMillis))
+				}
+				logger.Debugf("near limit, sleeping %d", doLimitResponse.ThrottleMillis)
 				this.timeSource.Sleep(time.Duration(doLimitResponse.ThrottleMillis) * time.Millisecond)
+				sem.Release(1)
 				doLimitResponse.ThrottleMillis = 0 // we throttle on the server side by sleeping, so reset this
+			} else {
+				if span != nil {
+					span.LogFields(otl.String("event", "throttling.sem_exhausted"), otl.Uint32("sleep_ms", doLimitResponse.ThrottleMillis))
+				}
 			}
 		}
 	}
 
-	response := &pb.RateLimitResponse{}
 	response.Statuses = make([]*pb.RateLimitResponse_DescriptorStatus, len(request.Descriptors))
 	finalCode := pb.RateLimitResponse_OK
 	for i, descriptorStatus := range doLimitResponse.DescriptorStatuses {
@@ -198,6 +212,9 @@ func (this *service) shouldRateLimitWorker(
 					Value: encodedStatus,
 				}
 				response.ResponseHeadersToAdd = append(response.ResponseHeadersToAdd, header)
+				if span != nil {
+					span.LogFields(otl.String("event", "add_response_header"), otl.String("x-ratelimit-details", encodedStatus))
+				}
 			}
 		}
 		if doLimitResponse.ThrottleMillis > 0 {
@@ -206,6 +223,9 @@ func (this *service) shouldRateLimitWorker(
 				Value: strconv.FormatInt(int64(doLimitResponse.ThrottleMillis), 10),
 			}
 			response.ResponseHeadersToAdd = append(response.ResponseHeadersToAdd, header)
+			if span != nil {
+				span.LogFields(otl.String("event", "add_response_header"), otl.Uint32("x-ratelimit-throttle-ms", doLimitResponse.ThrottleMillis))
+			}
 		}
 	}
 
