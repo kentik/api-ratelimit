@@ -68,7 +68,7 @@ func (this *BaseRateLimiter) IsOverLimitWithLocalCache(key string) bool {
 // Generates response descriptor status based on cache key, over the limit with local cache, over the limit and
 // near the limit thresholds. Thresholds are checked in order and are mutually exclusive.
 func (this *BaseRateLimiter) GetResponseDescriptorStatus(key string, limitInfo *LimitInfo,
-	isOverLimitWithLocalCache bool, hitsAddend uint32) *pb.RateLimitResponse_DescriptorStatus {
+	isOverLimitWithLocalCache bool, hitsAddend uint32, response *DoLimitResponse) *pb.RateLimitResponse_DescriptorStatus {
 	if key == "" {
 		return this.generateResponseDescriptorStatus(pb.RateLimitResponse_OK,
 			nil, 0)
@@ -109,7 +109,7 @@ func (this *BaseRateLimiter) GetResponseDescriptorStatus(key string, limitInfo *
 			limitInfo.limit.Limit, limitInfo.overLimitThreshold-limitInfo.limitAfterIncrease)
 
 		// The limit is OK but we additionally want to know if we are near the limit.
-		checkNearLimitThreshold(limitInfo, hitsAddend)
+		checkNearLimitThreshold(limitInfo, hitsAddend, this.timeSource.UnixNow(), response)
 	}
 	return responseDescriptorStatus
 }
@@ -144,8 +144,26 @@ func checkOverLimitThreshold(limitInfo *LimitInfo, hitsAddend uint32) {
 	}
 }
 
-func checkNearLimitThreshold(limitInfo *LimitInfo, hitsAddend uint32) {
+func max(a, b uint32) uint32 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func checkNearLimitThreshold(limitInfo *LimitInfo, hitsAddend uint32, now int64, response *DoLimitResponse) {
 	if limitInfo.limitAfterIncrease > limitInfo.nearLimitThreshold {
+
+		// compute the amount of throttling/pacing that would prevent the caller from hitting our rate limit
+		divider := utils.UnitToDivider(limitInfo.limit.Limit.Unit)
+		end := (now/divider)*divider + divider
+		millisRemaining := uint32(end-now) * 1000
+		callsRemaining := max(limitInfo.overLimitThreshold-limitInfo.limitAfterIncrease, 1)
+		throttleMillis := millisRemaining / callsRemaining
+		if response != nil && throttleMillis > response.ThrottleMillis {
+			response.ThrottleMillis = throttleMillis
+		}
+
 		// Here we also need to assess which portion of the hitsAddend were in the near limit range.
 		// If all the hits were over the nearLimitThreshold, then all hits are near limit. Otherwise,
 		// only the difference between the current limit value and the near limit threshold were near

@@ -90,14 +90,13 @@ func (this *fixedRateLimitCacheImpl) DoLimit(
 		DescriptorStatuses: make([]*pb.RateLimitResponse_DescriptorStatus, len(request.Descriptors)),
 	}
 	for i, cacheKey := range cacheKeys {
-
 		limitAfterIncrease := results[i]
 		limitBeforeIncrease := limitAfterIncrease - hitsAddend
 
 		limitInfo := limiter.NewRateLimitInfo(limits[i], limitBeforeIncrease, limitAfterIncrease, 0, 0)
 
-		responseDescriptorStatuses[i] = this.baseRateLimiter.GetResponseDescriptorStatus(cacheKey.Key,
-			limitInfo, isOverLimitWithLocalCache[i], hitsAddend)
+		response.DescriptorStatuses[i] = this.baseRateLimiter.GetResponseDescriptorStatus(cacheKey.Key,
+			limitInfo, isOverLimitWithLocalCache[i], hitsAddend, response)
 
 	}
 
