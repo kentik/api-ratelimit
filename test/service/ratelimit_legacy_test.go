@@ -1,6 +1,7 @@
 package ratelimit_test
 
 import (
+	"github.com/envoyproxy/ratelimit/src/limiter"
 	"testing"
 
 	core_legacy "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
@@ -65,7 +66,9 @@ func TestServiceLegacy(test *testing.T) {
 	}
 	t.config.EXPECT().GetLimit(nil, "test-domain", req.Descriptors[0]).Return(nil)
 	t.cache.EXPECT().DoLimit(nil, req, []*config.RateLimit{nil}).Return(
-		[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}})
+		&limiter.DoLimitResponse{
+			DescriptorStatuses: []*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}},
+		})
 
 	response, err := service.GetLegacyService().ShouldRateLimit(nil, legacyRequest)
 	common.AssertProtoEqual(
@@ -93,7 +96,7 @@ func TestServiceLegacy(test *testing.T) {
 	}
 
 	limits := []*config.RateLimit{
-		config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_MINUTE, "key", t.statStore),
+		config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_MINUTE, "key", t.statStore, false, false),
 		nil}
 	legacyLimits, err := convertRatelimits(limits)
 	if err != nil {
@@ -103,8 +106,9 @@ func TestServiceLegacy(test *testing.T) {
 	t.config.EXPECT().GetLimit(nil, "different-domain", req.Descriptors[0]).Return(limits[0])
 	t.config.EXPECT().GetLimit(nil, "different-domain", req.Descriptors[1]).Return(limits[1])
 	t.cache.EXPECT().DoLimit(nil, req, limits).Return(
-		[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[0].Limit, LimitRemaining: 0},
-			{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}})
+		&limiter.DoLimitResponse{
+			DescriptorStatuses: []*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[0].Limit, LimitRemaining: 0},
+				{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0}}})
 	response, err = service.GetLegacyService().ShouldRateLimit(nil, legacyRequest)
 	common.AssertProtoEqual(
 		t.assert,
@@ -130,7 +134,7 @@ func TestServiceLegacy(test *testing.T) {
 	// Config should still be valid. Also make sure order does not affect results.
 	limits = []*config.RateLimit{
 		nil,
-		config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_MINUTE, "key", t.statStore)}
+		config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_MINUTE, "key", t.statStore, false, false)}
 	legacyLimits, err = convertRatelimits(limits)
 	if err != nil {
 		t.assert.FailNow(err.Error())
@@ -139,8 +143,10 @@ func TestServiceLegacy(test *testing.T) {
 	t.config.EXPECT().GetLimit(nil, "different-domain", req.Descriptors[0]).Return(limits[0])
 	t.config.EXPECT().GetLimit(nil, "different-domain", req.Descriptors[1]).Return(limits[1])
 	t.cache.EXPECT().DoLimit(nil, req, limits).Return(
-		[]*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0},
-			{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[1].Limit, LimitRemaining: 0}})
+		&limiter.DoLimitResponse{
+			DescriptorStatuses: []*pb.RateLimitResponse_DescriptorStatus{{Code: pb.RateLimitResponse_OK, CurrentLimit: nil, LimitRemaining: 0},
+				{Code: pb.RateLimitResponse_OVER_LIMIT, CurrentLimit: limits[1].Limit, LimitRemaining: 0}},
+		})
 	response, err = service.GetLegacyService().ShouldRateLimit(nil, legacyRequest)
 	common.AssertProtoEqual(
 		t.assert,
@@ -193,7 +199,7 @@ func TestCacheErrorLegacy(test *testing.T) {
 	if err != nil {
 		t.assert.FailNow(err.Error())
 	}
-	limits := []*config.RateLimit{config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_MINUTE, "key", t.statStore)}
+	limits := []*config.RateLimit{config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_MINUTE, "key", t.statStore, false, false)}
 	t.config.EXPECT().GetLimit(nil, "different-domain", req.Descriptors[0]).Return(limits[0])
 	t.cache.EXPECT().DoLimit(nil, req, limits).Do(
 		func(context.Context, *pb.RateLimitRequest, []*config.RateLimit) {
@@ -221,7 +227,7 @@ func TestInitialLoadErrorLegacy(test *testing.T) {
 		func([]config.RateLimitConfigToLoad, stats.Scope) {
 			panic(config.RateLimitConfigError("load error"))
 		})
-	service := ratelimit.NewService(t.runtime, t.cache, t.configLoader, t.statStore, true)
+	service := ratelimit.NewService(t.runtime, t.cache, t.configLoader, t.statStore, true, nil)
 
 	request := common.NewRateLimitRequestLegacy("test-domain", [][][2]string{{{"hello", "world"}}}, 1)
 	response, err := service.GetLegacyService().ShouldRateLimit(nil, request)

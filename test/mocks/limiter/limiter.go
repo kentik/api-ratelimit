@@ -8,6 +8,7 @@ import (
 	context "context"
 	envoy_service_ratelimit_v3 "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
 	config "github.com/envoyproxy/ratelimit/src/config"
+	limiter "github.com/envoyproxy/ratelimit/src/limiter"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -36,10 +37,10 @@ func (m *MockRateLimitCache) EXPECT() *MockRateLimitCacheMockRecorder {
 }
 
 // DoLimit mocks base method
-func (m *MockRateLimitCache) DoLimit(arg0 context.Context, arg1 *envoy_service_ratelimit_v3.RateLimitRequest, arg2 []*config.RateLimit) []*envoy_service_ratelimit_v3.RateLimitResponse_DescriptorStatus {
+func (m *MockRateLimitCache) DoLimit(arg0 context.Context, arg1 *envoy_service_ratelimit_v3.RateLimitRequest, arg2 []*config.RateLimit) *limiter.DoLimitResponse {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DoLimit", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]*envoy_service_ratelimit_v3.RateLimitResponse_DescriptorStatus)
+	ret0, _ := ret[0].(*limiter.DoLimitResponse)
 	return ret0
 }
 

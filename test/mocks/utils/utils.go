@@ -7,6 +7,7 @@ package mock_utils
 import (
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+	time "time"
 )
 
 // MockTimeSource is a mock of TimeSource interface
@@ -30,6 +31,18 @@ func NewMockTimeSource(ctrl *gomock.Controller) *MockTimeSource {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockTimeSource) EXPECT() *MockTimeSourceMockRecorder {
 	return m.recorder
+}
+
+// Sleep mocks base method
+func (m *MockTimeSource) Sleep(arg0 time.Duration) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Sleep", arg0)
+}
+
+// Sleep indicates an expected call of Sleep
+func (mr *MockTimeSourceMockRecorder) Sleep(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sleep", reflect.TypeOf((*MockTimeSource)(nil).Sleep), arg0)
 }
 
 // UnixNow mocks base method

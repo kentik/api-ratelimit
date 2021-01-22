@@ -24,7 +24,7 @@ func TestGenerateCacheKeys(t *testing.T) {
 	timeSource.EXPECT().UnixNow().Return(int64(1234))
 	baseRateLimit := limiter.NewBaseRateLimit(timeSource, rand.New(jitterSource), 3600, nil, 0.8)
 	request := common.NewRateLimitRequest("domain", [][][2]string{{{"key", "value"}}}, 1)
-	limits := []*config.RateLimit{config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_SECOND, "key_value", statsStore)}
+	limits := []*config.RateLimit{config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_SECOND, "key_value", statsStore, false, false)}
 	assert.Equal(uint64(0), limits[0].Stats.TotalHits.Value())
 	cacheKeys := baseRateLimit.GenerateCacheKeys(request, limits, 1)
 	assert.Equal(1, len(cacheKeys))
@@ -61,7 +61,7 @@ func TestGetResponseStatusEmptyKey(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 	baseRateLimit := limiter.NewBaseRateLimit(nil, nil, 3600, nil, 0.8)
-	responseStatus := baseRateLimit.GetResponseDescriptorStatus("", nil, false, 1)
+	responseStatus := baseRateLimit.GetResponseDescriptorStatus("", nil, false, 1, nil)
 	assert.Equal(pb.RateLimitResponse_OK, responseStatus.GetCode())
 	assert.Equal(uint32(0), responseStatus.GetLimitRemaining())
 }
@@ -74,10 +74,10 @@ func TestGetResponseStatusOverLimitWithLocalCache(t *testing.T) {
 	timeSource.EXPECT().UnixNow().Return(int64(1234))
 	statsStore := stats.NewStore(stats.NewNullSink(), false)
 	baseRateLimit := limiter.NewBaseRateLimit(timeSource, nil, 3600, nil, 0.8)
-	limits := []*config.RateLimit{config.NewRateLimit(5, pb.RateLimitResponse_RateLimit_SECOND, "key_value", statsStore)}
+	limits := []*config.RateLimit{config.NewRateLimit(5, pb.RateLimitResponse_RateLimit_SECOND, "key_value", statsStore, false, false)}
 	limitInfo := limiter.NewRateLimitInfo(limits[0], 2, 6, 4, 5)
 	// As `isOverLimitWithLocalCache` is passed as `true`, immediate response is returned with no checks of the limits.
-	responseStatus := baseRateLimit.GetResponseDescriptorStatus("key", limitInfo, true, 2)
+	responseStatus := baseRateLimit.GetResponseDescriptorStatus("key", limitInfo, true, 2, nil)
 	assert.Equal(pb.RateLimitResponse_OVER_LIMIT, responseStatus.GetCode())
 	assert.Equal(uint32(0), responseStatus.GetLimitRemaining())
 	assert.Equal(limits[0].Limit, responseStatus.GetCurrentLimit())
@@ -94,9 +94,9 @@ func TestGetResponseStatusOverLimit(t *testing.T) {
 	statsStore := stats.NewStore(stats.NewNullSink(), false)
 	localCache := freecache.NewCache(100)
 	baseRateLimit := limiter.NewBaseRateLimit(timeSource, nil, 3600, localCache, 0.8)
-	limits := []*config.RateLimit{config.NewRateLimit(5, pb.RateLimitResponse_RateLimit_SECOND, "key_value", statsStore)}
+	limits := []*config.RateLimit{config.NewRateLimit(5, pb.RateLimitResponse_RateLimit_SECOND, "key_value", statsStore, false, false)}
 	limitInfo := limiter.NewRateLimitInfo(limits[0], 2, 7, 4, 5)
-	responseStatus := baseRateLimit.GetResponseDescriptorStatus("key", limitInfo, false, 1)
+	responseStatus := baseRateLimit.GetResponseDescriptorStatus("key", limitInfo, false, 1, nil)
 	assert.Equal(pb.RateLimitResponse_OVER_LIMIT, responseStatus.GetCode())
 	assert.Equal(uint32(0), responseStatus.GetLimitRemaining())
 	assert.Equal(limits[0].Limit, responseStatus.GetCurrentLimit())
@@ -112,12 +112,12 @@ func TestGetResponseStatusBelowLimit(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 	timeSource := mock_utils.NewMockTimeSource(controller)
-	timeSource.EXPECT().UnixNow().Return(int64(1234))
+	timeSource.EXPECT().UnixNow().Return(int64(1234)).MinTimes(1)
 	statsStore := stats.NewStore(stats.NewNullSink(), false)
 	baseRateLimit := limiter.NewBaseRateLimit(timeSource, nil, 3600, nil, 0.8)
-	limits := []*config.RateLimit{config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_SECOND, "key_value", statsStore)}
+	limits := []*config.RateLimit{config.NewRateLimit(10, pb.RateLimitResponse_RateLimit_SECOND, "key_value", statsStore, false, false)}
 	limitInfo := limiter.NewRateLimitInfo(limits[0], 2, 6, 9, 10)
-	responseStatus := baseRateLimit.GetResponseDescriptorStatus("key", limitInfo, false, 1)
+	responseStatus := baseRateLimit.GetResponseDescriptorStatus("key", limitInfo, false, 1, nil)
 	assert.Equal(pb.RateLimitResponse_OK, responseStatus.GetCode())
 	assert.Equal(uint32(4), responseStatus.GetLimitRemaining())
 	assert.Equal(uint64(0), limits[0].Stats.NearLimit.Value())
