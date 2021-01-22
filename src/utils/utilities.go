@@ -3,12 +3,14 @@ package utils
 import (
 	pb "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
 	"github.com/golang/protobuf/ptypes/duration"
+	"time"
 )
 
 // Interface for a time source.
 type TimeSource interface {
 	// @return the current unix time in seconds.
 	UnixNow() int64
+	Sleep(time.Duration)
 }
 
 // Convert a rate limit into a time divider.
