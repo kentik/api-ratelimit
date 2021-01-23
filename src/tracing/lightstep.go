@@ -75,7 +75,7 @@ func NewLightstepTracer(config LightstepConfig, version string) *LightstepTracer
 			opentracing.TextMap:     lightstep.B3Propagator,
 		},
 		Tags: map[string]interface{}{
-			lightstep.ComponentNameKey: "syn-back",
+			lightstep.ComponentNameKey: "apigw-ratelimit",
 			"service.version":          version,
 		},
 	})
