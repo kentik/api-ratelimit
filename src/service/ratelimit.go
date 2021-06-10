@@ -210,6 +210,10 @@ func (this *service) shouldRateLimitWorker(
 	}
 	response.OverallCode = finalCode
 
+	if span != nil {
+		span.SetTag("OverallCode", finalCode)
+	}
+
 	if reportDetails {
 		if this.reportDetailSampler.Sample() {
 			if status, err := json.Marshal(doLimitResponse); err == nil {
@@ -225,6 +229,10 @@ func (this *service) shouldRateLimitWorker(
 			}
 		}
 		if doLimitResponse.ThrottleMillis > 0 {
+			if span != nil {
+				span.SetTag("ThrottleMillis", doLimitResponse.ThrottleMillis)
+			}
+
 			header := &envoy_config_core_v3.HeaderValue{
 				Key:   "x-ratelimit-throttle-ms",
 				Value: strconv.FormatInt(int64(doLimitResponse.ThrottleMillis), 10),
