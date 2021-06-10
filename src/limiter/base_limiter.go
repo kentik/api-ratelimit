@@ -174,7 +174,9 @@ func checkNearLimitThreshold(limitInfo *LimitInfo, hitsAddend uint32, now int64,
 			limitInfo.limit.Stats.NearLimit.Add(uint64(limitInfo.limitAfterIncrease - limitInfo.nearLimitThreshold))
 		}
 	} else {
-		response.ThrottleMillis = 1
+		if response != nil {
+			response.ThrottleMillis = 1
+		}
 	}
 }
 
