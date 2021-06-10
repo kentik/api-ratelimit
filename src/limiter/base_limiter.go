@@ -159,7 +159,7 @@ func checkNearLimitThreshold(limitInfo *LimitInfo, hitsAddend uint32, now int64,
 		end := (now/divider)*divider + divider
 		millisRemaining := uint32(end-now) * 1000
 		callsRemaining := max(limitInfo.overLimitThreshold-limitInfo.limitAfterIncrease, 1)
-		throttleMillis := millisRemaining / callsRemaining
+		throttleMillis := (millisRemaining / callsRemaining) + 42
 		if response != nil && throttleMillis > response.ThrottleMillis {
 			response.ThrottleMillis = throttleMillis
 		}
@@ -173,6 +173,8 @@ func checkNearLimitThreshold(limitInfo *LimitInfo, hitsAddend uint32, now int64,
 		} else {
 			limitInfo.limit.Stats.NearLimit.Add(uint64(limitInfo.limitAfterIncrease - limitInfo.nearLimitThreshold))
 		}
+	} else {
+		response.ThrottleMillis = 1
 	}
 }
 
