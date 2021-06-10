@@ -175,21 +175,28 @@ func (this *service) shouldRateLimitWorker(
 	assert.Assert(len(limitsToCheck) == len(doLimitResponse.DescriptorStatuses))
 
 	if sleepOnThrottle && doLimitResponse.ThrottleMillis > 0 {
+		var throttleSpan opentracing.Span
+		if span != nil {
+			throttleSpan = span.Tracer().StartSpan("sleep_on_throttle", opentracing.ChildOf(span.Context()))
+			throttleSpan.LogFields(otl.String("event", "throttling.sleep"), otl.Uint32("sleep_ms", doLimitResponse.ThrottleMillis))
+		}
+
 		sem := this.sleeperSemaphore
 		if sem != nil {
 			if sem.TryAcquire(1) {
-				if span != nil {
-					span.LogFields(otl.String("event", "throttling.sleep"), otl.Uint32("sleep_ms", doLimitResponse.ThrottleMillis))
-				}
 				logger.Debugf("near limit, sleeping %d", doLimitResponse.ThrottleMillis)
 				this.timeSource.Sleep(time.Duration(doLimitResponse.ThrottleMillis) * time.Millisecond)
 				sem.Release(1)
 				doLimitResponse.ThrottleMillis = 0 // we throttle on the server side by sleeping, so reset this
 			} else {
-				if span != nil {
-					span.LogFields(otl.String("event", "throttling.sem_exhausted"), otl.Uint32("sleep_ms", doLimitResponse.ThrottleMillis))
+				if throttleSpan != nil {
+					throttleSpan.LogFields(otl.String("event", "throttling.sem_exhausted"), otl.Uint32("sleep_ms", doLimitResponse.ThrottleMillis))
 				}
 			}
+		}
+
+		if throttleSpan != nil {
+			throttleSpan.Finish()
 		}
 	}
 
