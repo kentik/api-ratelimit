@@ -178,7 +178,7 @@ func (this *service) shouldRateLimitWorker(
 		var throttleSpan opentracing.Span
 		if span != nil {
 			throttleSpan = span.Tracer().StartSpan("sleep_on_throttle", opentracing.ChildOf(span.Context()))
-			throttleSpan.LogFields(otl.String("event", "throttling.sleep"), otl.Uint32("sleep_ms", doLimitResponse.ThrottleMillis))
+			throttleSpan.SetTag("throttling.sleep_ms", doLimitResponse.ThrottleMillis)
 		}
 
 		sem := this.sleeperSemaphore
@@ -190,7 +190,8 @@ func (this *service) shouldRateLimitWorker(
 				doLimitResponse.ThrottleMillis = 0 // we throttle on the server side by sleeping, so reset this
 			} else {
 				if throttleSpan != nil {
-					throttleSpan.LogFields(otl.String("event", "throttling.sem_exhausted"), otl.Uint32("sleep_ms", doLimitResponse.ThrottleMillis))
+					throttleSpan.LogFields(otl.String("event", "throttling.sem_exhausted"))
+					throttleSpan.SetTag("error", true)
 				}
 			}
 		}
