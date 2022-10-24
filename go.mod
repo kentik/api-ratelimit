@@ -19,11 +19,12 @@ require (
 	github.com/lyft/gostats v0.4.0
 	github.com/mediocregopher/radix/v3 v3.5.1
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/sirupsen/logrus v1.6.0
+	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/objx v0.2.0 // indirect
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.7.0
 	golang.org/x/net v0.0.0-20200421231249-e086a090c8fd
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.3.3-0.20191122225017-cbf43d21aaeb // indirect
 	google.golang.org/grpc v1.29.1
 	google.golang.org/protobuf v1.25.0 // indirect
