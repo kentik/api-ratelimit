@@ -2,7 +2,6 @@ app_count = 1
 job_name = "apigw-ratelimit"
 
 docker_image = "kentik-apigw-ratelimit"
-
 consul_service_name = "apigw-ratelimit"
 
 consul_service = {

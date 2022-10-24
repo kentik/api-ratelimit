@@ -4,6 +4,6 @@ constraints = [
   {
     attribute = "$${attr.unique.hostname}"
     operator  = "="
-    value     = "c102.our1.kentik.com"
+    value     = "c101.our1.kentik.com"
   }
 ]
