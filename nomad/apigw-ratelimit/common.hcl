@@ -74,7 +74,7 @@ volumes = {
   "apigw-ratelimit-config" = {
     type        = "host"
     source      = "apigw-ratelimit-config"
-    destination = "/run"
+    destination = "/run/ratelimit"
     read_only   = true
   }
 }
@@ -82,7 +82,3 @@ volumes = {
 args = [
   "/usr/bin/ratelimit-server"
 ]
-
-// registry.our1.kentik.com:5000/kentik-api-ratelimit:nomad.7
-// registry.our1.kentik.com:5000/kentik-api-ratelimit
-// registry.our1.kentik.com:5000/kentik-apigw-ratelimit:nomad.7
