@@ -10,4 +10,4 @@ lint:
 nomad:
   - service_group: apigw-ratelimit
     pack: service
-    branch: hiera
+    branch: fix-secret
