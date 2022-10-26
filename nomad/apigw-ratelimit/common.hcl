@@ -65,7 +65,6 @@ network = {
 env_secrets = [
   {
     source = "kt_secrets::redis_api_general_master_password"
-    prefix = "hiera/data/puppet"
     dest   = "REDIS_AUTH"
   }
 ]
