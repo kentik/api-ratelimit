@@ -1,7 +1,7 @@
 app_count = 1
 job_name  = "apigw-ratelimit"
 
-docker_image        = "kentik-apigw-ratelimit"
+docker_image        = "kentik-api-ratelimit"
 consul_service_name = "apigw-ratelimit"
 
 consul_service = {
@@ -82,3 +82,7 @@ volumes = {
 args = [
   "/usr/bin/ratelimit-server"
 ]
+
+// registry.our1.kentik.com:5000/kentik-api-ratelimit:nomad.7
+// registry.our1.kentik.com:5000/kentik-api-ratelimit
+// registry.our1.kentik.com:5000/kentik-apigw-ratelimit:nomad.7
