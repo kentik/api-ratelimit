@@ -1,18 +1,21 @@
-app_count = 1
-job_name  = "apigw-ratelimit"
+app_count    = 1
+job_name     = "apigw-ratelimit"
+docker_image = "kentik-api-ratelimit"
+use_runtime_count = true
+pin_nodes = true
 
-docker_image        = "kentik-api-ratelimit"
-consul_service_name = "apigw-ratelimit"
-
-consul_service = {
-  enabled            = true
-  service_name       = "apigw-ratelimit"
-  service_port_label = "grpc"
-  service_tags       = [],
-  check_type         = "grpc"
-  check_path         = "/hc"
-  check_interval     = "5s"
-  check_timeout      = "1s"
+network = {
+  mode = "host"
+  ports = {
+    "grpc" = {
+      port       = 9543
+      check_type = "grpc"
+    }
+    // "admin" = {
+    //   port           = 9485
+    //   check_disabled = true
+    // }
+  }
 }
 
 env_vars = [
@@ -46,7 +49,7 @@ env_vars = [
   },
   {
     key   = "GRPC_PORT"
-    value = "9543"
+    value = "9484"
   },
   {
     key   = "PORT",
@@ -54,13 +57,6 @@ env_vars = [
   }
 ]
 
-network = {
-  mode   = "host"
-  static = true
-  ports = {
-    "grpc" = 9543
-  }
-}
 
 env_secrets = [
   {
