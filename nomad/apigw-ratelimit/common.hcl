@@ -1,20 +1,21 @@
-app_count    = 1
-job_name     = "apigw-ratelimit"
-docker_image = "kentik-api-ratelimit"
+app_count         = 1
+job_name          = "apigw-ratelimit"
+docker_image      = "kentik-api-ratelimit"
 use_runtime_count = true
-pin_nodes = true
+pin_nodes         = true
 
 network = {
   mode = "host"
   ports = {
     "grpc" = {
-      port       = 9543
+      port       = 9484
       check_type = "grpc"
     }
-    // "admin" = {
-    //   port           = 9485
-    //   check_disabled = true
-    // }
+    "admin" = {
+      port       = 9485
+      check_type = "http"
+      check_path = "/healthcheck"
+    }
   }
 }
 
