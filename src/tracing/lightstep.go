@@ -51,7 +51,7 @@ func GetLightstepConfigFromEnv() LightstepConfig {
 
 type LightstepTracer struct {
 	lightstep.Tracer
-	Enabled bool
+	Enabled                  bool
 	LightstepShutdownTimeout time.Duration
 }
 
@@ -87,8 +87,8 @@ func NewLightstepTracer(config LightstepConfig, version string) *LightstepTracer
 
 	//l.Infof("Lightstep tracing enabled")
 	return &LightstepTracer{
-		Tracer:                   lightstepTracer,
-		Enabled:                  true,
+		Tracer:  lightstepTracer,
+		Enabled: true,
 		//ContextL:                 l,
 		LightstepShutdownTimeout: time.Second,
 	}
