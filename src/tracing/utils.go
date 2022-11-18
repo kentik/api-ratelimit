@@ -87,5 +87,3 @@ func ParseBoolDefault(s string, def bool) (bool, error) {
 func EscapeColonInString(input string) string {
 	return strings.Replace(input, ":", "_", -1)
 }
-
-

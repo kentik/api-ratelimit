@@ -125,7 +125,7 @@ func (this *service) shouldRateLimitWorker(
 
 	span := opentracing.SpanFromContext(ctx)
 	if span != nil {
-		span.LogFields(otl.String("event",  "shouldRateLimitWorker.start"))
+		span.LogFields(otl.String("event", "shouldRateLimitWorker.start"))
 		defer span.LogFields(otl.String("event", "shouldRateLimitWorker.done"), otl.Int32("response.code", int32(response.OverallCode)))
 	}
 

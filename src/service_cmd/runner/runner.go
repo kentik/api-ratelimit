@@ -1,13 +1,14 @@
 package runner
 
 import (
-	"github.com/envoyproxy/ratelimit/src/tracing"
-	grpcopentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"io"
 	"math/rand"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/envoyproxy/ratelimit/src/tracing"
+	grpcopentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 
 	stats "github.com/lyft/gostats"
 
@@ -88,7 +89,9 @@ func (runner *Runner) Run() {
 
 	lightstep := tracing.NewLightstepTracer(tracing.GetLightstepConfigFromEnv(), "1.0")
 	defer lightstep.Close()
-	
+
+	logger.Infof("starting limiter with config: %+v", s)
+
 	srv := server.NewServer("ratelimit", runner.statsStore, localCache, settings.GrpcUnaryInterceptor(grpcopentracing.UnaryServerInterceptor()))
 
 	timeSource := utils.NewTimeSourceImpl()

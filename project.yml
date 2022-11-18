@@ -5,6 +5,9 @@ target:
   build: unset GOPATH && make -f Makefile.kentik all install
   test: kbt go-mod-tests
 lint:
-  golinter: golangci-lint
   go:
     - errcheck:error
+nomad:
+  - service_group: apigw-ratelimit
+    pack: service
+    branch: main
