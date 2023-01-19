@@ -1,8 +1,14 @@
-app_count         = 1
 job_name          = "apigw-ratelimit"
 docker_image      = "kentik-api-ratelimit"
-use_runtime_count = true
-pin_nodes         = true
+
+
+scaling = {
+  enabled = true
+  meta_attribute_policy = {
+    enabled   = true
+    attribute = "run_apigw-ratelimit"
+  }
+}
 
 network = {
   mode = "host"
