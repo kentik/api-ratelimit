@@ -1,12 +1,8 @@
 job_name          = "apigw-ratelimit"
-docker_image      = "kentik-api-ratelimit"
-
 
 scaling = {
-  enabled = true
-  meta_attribute_policy = {
-    enabled   = true
-    attribute = "run_apigw-ratelimit"
+  attribute_policy = {
+    key = "run_apigw-ratelimit"
   }
 }
 
