@@ -72,22 +72,12 @@ env_vars = [
   }
 ]
 
-
 env_secrets = [
   {
     source = "kt_secrets::redis_api_general_master_password"
     dest   = "REDIS_AUTH"
   }
 ]
-
-# volumes = {
-#   "apigw-ratelimit-config" = {
-#     type        = "host"
-#     source      = "apigw-ratelimit-config"
-#     destination = "/run/ratelimit/config"
-#     read_only   = false
-#   }
-# }
 
 docker_volumes = ["/data/service/apigw/ratelimit:/run/ratelimit/config"]
 args = [
