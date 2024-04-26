@@ -1,7 +1,7 @@
 job_name          = "apigw-ratelimit"
 docker_image      = "kentik-api-ratelimit"
 
-app_count = 1
+app_count = 2
 
 constraints = [
   {

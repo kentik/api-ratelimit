@@ -347,7 +347,7 @@ func NewService(runtime loader.IFace, cache limiter.RateLimitCache,
 		for {
 			logger.Debugf("waiting for runtime update")
 			<-newService.runtimeUpdateEvent
-			logger.Debugf("got runtime update and reloading config")
+			logger.Info("got runtime update and reloading config")
 			newService.reloadConfig()
 		}
 	}()
