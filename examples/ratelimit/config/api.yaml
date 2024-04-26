@@ -1,0 +1,65 @@
+---
+# post-auth limiters with per company overrides
+domain: api
+descriptors:
+  - key: cid
+    rate_limit:
+      requests_per_unit: 3600
+      unit: minute
+    descriptors:
+      - key: path
+        value: /kentik.kagent.v202401.CapabilityReleaseService/GetCapabilityLatestReleases
+        report_details: true
+        sleep_on_throttle: false
+        rate_limit:
+          requests_per_unit: 2
+          unit: minute
+      - key: banana
+        value: test
+        report_details: true
+        sleep_on_throttle: false
+        rate_limit:
+          requests_per_unit: 2
+          unit: minute
+      - key: uid
+        report_details: true
+        sleep_on_throttle: false
+        rate_limit:
+          requests_per_unit: 1800
+          unit: minute
+  - key: uid
+    value: 7301
+    rate_limit:
+      requests_per_unit: 1
+      unit: minute
+  - key: cid
+    value: 2009
+    rate_limit:
+      requests_per_unit: 6000
+      unit: minute
+    descriptors:
+      - key: uid
+        rate_limit:
+          requests_per_unit: 3000
+          unit: minute
+  - key: cid
+    value: 165821
+    rate_limit:
+      requests_per_unit: 18000
+      unit: minute
+    descriptors:
+      - key: uid
+        rate_limit:
+          requests_per_unit: 15000
+          unit: minute
+  # reduce ratelimit on tesla kproxy logs/metrics
+  - key: cid
+    value: 61889
+    rate_limit:
+      requests_per_unit: 25000
+      unit: minute
+    descriptors:
+      - key: uid
+        rate_limit:
+          requests_per_unit: 25000
+          unit: minute

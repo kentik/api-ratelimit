@@ -47,6 +47,10 @@ env_vars = [
     value = "ratelimit"
   },
   {
+    key = "RUNTIME_WATCH_ROOT"
+    value = "false"
+  },
+  {
     key   = "RUNTIME_IGNOREDOTFILES"
     value = "true"
   },
