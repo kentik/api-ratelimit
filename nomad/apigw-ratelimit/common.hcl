@@ -1,6 +1,4 @@
-job_name          = "apigw-ratelimit"
-docker_image      = "kentik-api-ratelimit"
-
+job_name  = "apigw-ratelimit"
 app_count = 2
 
 constraints = [
@@ -47,7 +45,7 @@ env_vars = [
     value = "ratelimit"
   },
   {
-    key = "RUNTIME_WATCH_ROOT"
+    key   = "RUNTIME_WATCH_ROOT"
     value = "false"
   },
   {
@@ -80,6 +78,7 @@ env_secrets = [
 ]
 
 docker_volumes = ["/data/service/apigw/ratelimit:/run/ratelimit/config"]
+
 args = [
   "/usr/bin/ratelimit-server"
 ]
