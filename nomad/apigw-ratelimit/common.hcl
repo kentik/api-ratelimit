@@ -76,15 +76,16 @@ env_secrets = [
   }
 ]
 
-volumes = {
-  "apigw-ratelimit-config" = {
-    type        = "host"
-    source      = "apigw-ratelimit-config"
-    destination = "/run/ratelimit"
-    read_only   = true
-  }
-}
+# volumes = {
+#   "apigw-ratelimit-config" = {
+#     type        = "host"
+#     source      = "apigw-ratelimit-config"
+#     destination = "/run/ratelimit/config"
+#     read_only   = false
+#   }
+# }
 
+docker_volumes = ["/data/service/apigw/ratelimit:/run/ratelimit/config"]
 args = [
   "/usr/bin/ratelimit-server"
 ]
