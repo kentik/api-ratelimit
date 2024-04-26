@@ -4,14 +4,18 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	"github.com/envoyproxy/ratelimit/src/utils"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	otl "github.com/opentracing/opentracing-go/log"
-	"strings"
-	"sync"
-	"time"
+
+	"os"
+	"strconv"
 
 	pb "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
 	"github.com/envoyproxy/ratelimit/src/assert"
@@ -23,8 +27,6 @@ import (
 	logger "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/sync/semaphore"
-	"os"
-	"strconv"
 )
 
 type shouldRateLimitStats struct {
@@ -101,6 +103,7 @@ func (this *service) reloadConfig() {
 
 	newConfig := this.configLoader.Load(files, this.rlStatsScope)
 	this.stats.configLoadSuccess.Inc()
+	logger.Info("loaded new configuration from runtime")
 	this.configLock.Lock()
 	this.config = newConfig
 	this.configLock.Unlock()
