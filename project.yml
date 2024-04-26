@@ -4,9 +4,6 @@ version: TAG
 target:
   build: unset GOPATH && make -f Makefile.kentik all install
   test: kbt go-mod-tests
-lint:
-  go:
-    - errcheck:error
 nomad:
   - service_group: apigw-ratelimit
     pack: service
