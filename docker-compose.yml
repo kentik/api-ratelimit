@@ -10,32 +10,6 @@ services:
     networks:
       - ratelimit-network
 
-#  memcached:
-#    image: memcached:alpine
-#    expose:
-#      - 11211
-#    ports:
-#      - 11211:11211
-#    networks:
-#      - ratelimit-network
-
-  # minimal container that builds the ratelimit service binary and exits.
-#  ratelimit-build:
-#    image: golang:1.14-alpine
-#    working_dir: /go/src/github.com/envoyproxy/ratelimit
-#    command: go build -o /usr/local/bin/ratelimit ./src/service_cmd/main.go
-#    volumes:
-#      - .:/go/src/github.com/envoyproxy/ratelimit
-#      - binary:/usr/local/bin/
-
-#  ratelimit-client-build:
-#    image: golang:1.14-alpine
-#    working_dir: /go/src/github.com/envoyproxy/ratelimit
-#    command: go build -o /usr/local/bin/ratelimit_client ./src/client_cmd/main.go
-#    volumes:
-#      - .:/go/src/github.com/envoyproxy/ratelimit
-#      - binary:/usr/local/bin/
-
   ratelimit:
     image: gcr.io/kentik-continuous-delivery/kentik-api-ratelimit:kentik.27
     command: /usr/bin/ratelimit-server
@@ -66,6 +40,3 @@ services:
 
 networks:
   ratelimit-network:
-
-#volumes:
-#  binary:
