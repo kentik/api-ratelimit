@@ -65,6 +65,10 @@ env_vars = [
   {
     key   = "PORT",
     value = "9485"
+  },
+  {
+    key   = "LOG_LEVEL",
+    value = "info"
   }
 ]
 
