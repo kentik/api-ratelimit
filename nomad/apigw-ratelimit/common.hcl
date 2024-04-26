@@ -1,10 +1,12 @@
-job_name          = "apigw-ratelimit"
+job_name  = "apigw-ratelimit"
+app_count = 2
 
-scaling = {
-  attribute_policy = {
-    key = "run_apigw-ratelimit"
+constraints = [
+  {
+    attribute = "$${meta.run_apigw-ratelimit}"
+    value     = "true"
   }
-}
+]
 
 network = {
   mode = "host"
@@ -43,6 +45,10 @@ env_vars = [
     value = "ratelimit"
   },
   {
+    key   = "RUNTIME_WATCH_ROOT"
+    value = "false"
+  },
+  {
     key   = "RUNTIME_IGNOREDOTFILES"
     value = "true"
   },
@@ -57,9 +63,12 @@ env_vars = [
   {
     key   = "PORT",
     value = "9485"
+  },
+  {
+    key   = "LOG_LEVEL",
+    value = "info"
   }
 ]
-
 
 env_secrets = [
   {
@@ -68,14 +77,7 @@ env_secrets = [
   }
 ]
 
-volumes = {
-  "apigw-ratelimit-config" = {
-    type        = "host"
-    source      = "apigw-ratelimit-config"
-    destination = "/run/ratelimit"
-    read_only   = true
-  }
-}
+docker_volumes = ["/data/service/apigw/ratelimit:/run/ratelimit/config"]
 
 args = [
   "/usr/bin/ratelimit-server"

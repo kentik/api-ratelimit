@@ -4,10 +4,12 @@ version: TAG
 target:
   build: unset GOPATH && make -f Makefile.kentik all install
   test: kbt go-mod-tests
-lint:
-  go:
-    - errcheck:error
 nomad:
   - service_group: apigw-ratelimit
     pack: service
     branch: main
+docker:
+  build:
+    base: kt-build-generic-bullseye:master
+  run:
+    base: kt-run-generic-bullseye:master
