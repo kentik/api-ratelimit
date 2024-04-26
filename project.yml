@@ -8,3 +8,8 @@ nomad:
   - service_group: apigw-ratelimit
     pack: service
     branch: main
+docker:
+  build:
+    base: kt-build-generic-bullseye:master
+  run:
+    base: kt-run-generic-bullseye:master
