@@ -31,10 +31,6 @@ env_vars = [
     value = "redis://$${attr.unique.network.ip-address}:9489/11"
   },
   {
-    key   = "MAX_SLEEPING_ROUTINES"
-    value = "64"
-  },
-  {
     key   = "GRPC_PORT"
     value = "$${NOMAD_PORT_grpc}"
   },
@@ -52,7 +48,7 @@ env_vars = [
   },
   {
     key = "FORCE_START_WITHOUT_INITIAL_CONFIG"
-    value = "true"
+    value = "false"
   },
   {
     key = "CONFIG_TYPE"
