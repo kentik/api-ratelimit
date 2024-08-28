@@ -1,6 +1,14 @@
 job_name  = "controlplane-ratelimit"
 app_count = 2
 
+
+constraints = [
+  {
+    attribute = "$${meta.workload_type_portal}"
+    value     = "true"
+  }
+]
+
 network = {
   mode = "host"
   ports = {
