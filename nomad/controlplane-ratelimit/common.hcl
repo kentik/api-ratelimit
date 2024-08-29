@@ -56,7 +56,7 @@ env_vars = [
   },
   {
     key   = "LOG_LEVEL",
-    value = "debug"
+    value = "info"
   },
   {
     key = "FORCE_START_WITHOUT_INITIAL_CONFIG"
