@@ -28,7 +28,11 @@ network = {
 env_vars = [
   {
     key   = "USE_STATSD"
-    value = "false"
+    value = "true"
+  },
+  {
+    key = "STATSD_PORT"
+    value = "8190"
   },
   {
     key   = "REDIS_SOCKET_TYPE"
