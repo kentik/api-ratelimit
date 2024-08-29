@@ -27,8 +27,8 @@ network = {
 
 env_vars = [
   {
-    key   = "USE_STATSD"
-    value = "false"
+    key   = "DISABLE_STATS"
+    value = "true"
   },
   {
     key   = "REDIS_SOCKET_TYPE"
@@ -71,9 +71,21 @@ env_vars = [
     value = "localhost:9599"
   },
   {
-    key = "DISABLE_STATS"
-    value = "false"
+    key = "OTEL_EXPORTER_OTLP_ENDPOINT"
+    value = "http://127.0.0.1:26000"
   },
+  {
+    key = "TRACING_EXPORTER_PROTOCOL"
+    value = "grpc"
+  },
+  {
+    key = "TRACING_SERVICE_NAME"
+    value = "controlplane-ratelimit"
+  },
+  {
+    key = "TRACING_SERVICE_INSTANCE_ID"
+    value = "$${NOMAD_ALLOC_ID}"
+  }
 ]
 
 env_secrets = [
