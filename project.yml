@@ -5,9 +5,6 @@ target:
   build: make -f Makefile.kentik all install
   test: kbt go-mod-tests
 nomad:
-  - config_dir: apigw-ratelimit
-    pack: service
-    branch: main
   - config_dir: controlplane-ratelimit
     pack: service
     branch: main
