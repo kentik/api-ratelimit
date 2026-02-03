@@ -4,7 +4,7 @@ app_count = 2
 
 constraints = [
   {
-    attribute = "$${meta.workload_type_portal}"
+    attribute = "$${meta.run_envoy-portal}"
     value     = "true"
   }
 ]
