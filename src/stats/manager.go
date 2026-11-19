@@ -1,6 +1,8 @@
 package stats
 
 import (
+	"fmt"
+
 	gostats "github.com/lyft/gostats"
 )
 
@@ -54,6 +56,31 @@ type RateLimitStats struct {
 	OverLimitWithLocalCache gostats.Counter
 	WithinLimit             gostats.Counter
 	ShadowMode              gostats.Counter
+	// Cumulative: a hit within the limit counts in every bucket whose MaxPercent is at least the share of the
+	// limit used after the hit. Hits over the limit count in none, so over-limit = total_hits - the 100% bucket.
+	Utilization []UtilizationBucket
+}
+
+// UtilizationBucket counts hits that arrived with at most MaxPercent of the limit used (including the hit).
+type UtilizationBucket struct {
+	MaxPercent uint32
+	Counter    gostats.Counter
+}
+
+// UtilizationBucketPercents are the bucket bounds, the same as the ui-app (v5 API) rate_limit_utilization_ratio
+// histogram, so the v5 and v6 headroom panels can be compared.
+var UtilizationBucketPercents = []uint32{10, 25, 50, 75, 90, 100}
+
+// NewUtilizationBuckets creates the <key>.utilization_le_<percent> counters.
+func NewUtilizationBuckets(scope gostats.Scope, key string) []UtilizationBucket {
+	buckets := make([]UtilizationBucket, len(UtilizationBucketPercents))
+	for i, percent := range UtilizationBucketPercents {
+		buckets[i] = UtilizationBucket{
+			MaxPercent: percent,
+			Counter:    scope.NewCounter(fmt.Sprintf("%s.utilization_le_%d", key, percent)),
+		}
+	}
+	return buckets
 }
 
 // Stats for a domain entry

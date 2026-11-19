@@ -127,6 +127,7 @@ func (this *BaseRateLimiter) GetResponseDescriptorStatus(key string, limitInfo *
 
 			// The limit is OK but we additionally want to know if we are near the limit.
 			this.checkNearLimitThreshold(limitInfo, hitsAddend)
+			this.recordUtilization(limitInfo, hitsAddend)
 			limitInfo.limit.Stats.WithinLimit.Add(uint64(hitsAddend))
 		}
 	}
@@ -170,6 +171,21 @@ func (this *BaseRateLimiter) checkOverLimitThreshold(limitInfo *LimitInfo, hitsA
 		// If the limit before increase was below the over limit value, then some of the hits were
 		// in the near limit range.
 		limitInfo.limit.Stats.NearLimit.Add(uint64(limitInfo.overLimitThreshold - utils.Max(limitInfo.nearLimitThreshold, limitInfo.limitBeforeIncrease)))
+	}
+}
+
+// recordUtilization counts a hit within the limit in every utilization bucket that covers the share of the limit
+// in use after the hit. Integer math: used/limit <= percent/100.
+func (this *BaseRateLimiter) recordUtilization(limitInfo *LimitInfo, hitsAddend uint32) {
+	limit := uint64(limitInfo.overLimitThreshold)
+	if limit == 0 {
+		return
+	}
+	used := uint64(limitInfo.limitAfterIncrease) * 100
+	for _, bucket := range limitInfo.limit.Stats.Utilization {
+		if used <= uint64(bucket.MaxPercent)*limit {
+			bucket.Counter.Add(uint64(hitsAddend))
+		}
 	}
 }
 
