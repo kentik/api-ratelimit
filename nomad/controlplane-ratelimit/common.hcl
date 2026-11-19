@@ -26,9 +26,79 @@ network = {
 }
 
 env_vars = [
+  // Stats go as DogStatsD over UDP to the host's Telegraf statsd input (kt_defaults::telegraf, port 8190), which
+  // writes them to VictoriaMetrics as <name>_value with the tags as labels. USE_STATSD must be off: the runner
+  // refuses to start with both sinks on. (With both off, stats went to stdout, which is why #12 disabled them.)
   {
-    key   = "DISABLE_STATS"
+    key   = "USE_DOG_STATSD"
     value = "true"
+  },
+  {
+    key   = "USE_STATSD"
+    value = "false"
+  },
+  {
+    key   = "STATSD_HOST"
+    value = "127.0.0.1"
+  },
+  {
+    key   = "STATSD_PORT"
+    value = "8190"
+  },
+  // Mogrifiers turn ratelimit.service.rate_limit.<domain>.<descriptor path>.<stat> into one metric per stat with
+  // domain/descriptor tags. The first match wins. Per-company overrides (cid_<id>) are folded into
+  // descriptor=cid_override.<rest>, so no metric carries a company id; per-company questions go to traces.
+  {
+    key   = "USE_DOG_STATSD_MOGRIFIERS"
+    value = "OVERRIDE_UTILIZATION,UTILIZATION,OVERRIDE,DESCRIPTOR"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_OVERRIDE_UTILIZATION_PATTERN"
+    value = "^ratelimit\\.service\\.rate_limit\\.([^.]+)\\.cid_[0-9]+\\.(.*)\\.utilization_le_([0-9]+)$"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_OVERRIDE_UTILIZATION_NAME"
+    value = "ratelimit.service.rate_limit.utilization"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_OVERRIDE_UTILIZATION_TAGS"
+    value = "domain:$1,descriptor:cid_override.$2,utilization_le:$3"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_UTILIZATION_PATTERN"
+    value = "^ratelimit\\.service\\.rate_limit\\.([^.]+)\\.(.*)\\.utilization_le_([0-9]+)$"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_UTILIZATION_NAME"
+    value = "ratelimit.service.rate_limit.utilization"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_UTILIZATION_TAGS"
+    value = "domain:$1,descriptor:$2,utilization_le:$3"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_OVERRIDE_PATTERN"
+    value = "^ratelimit\\.service\\.rate_limit\\.([^.]+)\\.cid_[0-9]+\\.(.*)\\.([^.]+)$"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_OVERRIDE_NAME"
+    value = "ratelimit.service.rate_limit.$3"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_OVERRIDE_TAGS"
+    value = "domain:$1,descriptor:cid_override.$2"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_DESCRIPTOR_PATTERN"
+    value = "^ratelimit\\.service\\.rate_limit\\.([^.]+)\\.(.*)\\.([^.]+)$"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_DESCRIPTOR_NAME"
+    value = "ratelimit.service.rate_limit.$3"
+  },
+  {
+    key   = "DOG_STATSD_MOGRIFIER_DESCRIPTOR_TAGS"
+    value = "domain:$1,descriptor:$2"
   },
   {
     key   = "REDIS_SOCKET_TYPE"

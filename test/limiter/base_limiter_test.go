@@ -229,3 +229,54 @@ func TestGetResponseStatusBelowLimitShadowMode(t *testing.T) {
 	// No shadow_mode so, no stats change
 	assert.Equal(uint64(0), limits[0].Stats.ShadowMode.Value())
 }
+
+func utilizationCounts(rl *config.RateLimit) map[uint32]uint64 {
+	counts := map[uint32]uint64{}
+	for _, bucket := range rl.Stats.Utilization {
+		counts[bucket.MaxPercent] = bucket.Counter.Value()
+	}
+	return counts
+}
+
+func newUtilizationTestLimit(t *testing.T, requestsPerUnit uint32) (*limiter.BaseRateLimiter, *config.RateLimit) {
+	timeSource := mock_utils.NewMockTimeSource(gomock.NewController(t))
+	timeSource.EXPECT().UnixNow().Return(int64(1234)).AnyTimes()
+	sm := mockstats.NewMockStatManager(stats.NewStore(stats.NewNullSink(), false))
+	baseRateLimit := limiter.NewBaseRateLimit(timeSource, nil, 3600, nil, 0.8, "", sm)
+	rl := config.NewRateLimit(requestsPerUnit, pb.RateLimitResponse_RateLimit_MINUTE, sm.NewStats("key_value"), false, false, "", nil, false)
+	return baseRateLimit, rl
+}
+
+func TestUtilizationBucketsCountHitsWithinLimit(t *testing.T) {
+	baseRateLimit, rl := newUtilizationTestLimit(t, 10)
+
+	// 6 of 10 used after this hit: 60%
+	baseRateLimit.GetResponseDescriptorStatus("key", limiter.NewRateLimitInfo(rl, 5, 6, 0, 0), false, 1)
+
+	assert.Equal(t, map[uint32]uint64{10: 0, 25: 0, 50: 0, 75: 1, 90: 1, 100: 1}, utilizationCounts(rl))
+}
+
+func TestUtilizationBucketsCountTheLastHitUnderTheLimitAt100(t *testing.T) {
+	baseRateLimit, rl := newUtilizationTestLimit(t, 10)
+
+	baseRateLimit.GetResponseDescriptorStatus("key", limiter.NewRateLimitInfo(rl, 9, 10, 0, 0), false, 1)
+
+	assert.Equal(t, map[uint32]uint64{10: 0, 25: 0, 50: 0, 75: 0, 90: 0, 100: 1}, utilizationCounts(rl))
+}
+
+func TestUtilizationBucketsSkipHitsOverTheLimit(t *testing.T) {
+	baseRateLimit, rl := newUtilizationTestLimit(t, 5)
+
+	baseRateLimit.GetResponseDescriptorStatus("key", limiter.NewRateLimitInfo(rl, 5, 6, 0, 0), false, 1)
+
+	assert.Equal(t, map[uint32]uint64{10: 0, 25: 0, 50: 0, 75: 0, 90: 0, 100: 0}, utilizationCounts(rl))
+	assert.Equal(t, uint64(1), rl.Stats.OverLimit.Value())
+}
+
+func TestUtilizationBucketsAddEveryHitOfAMultiHitRequest(t *testing.T) {
+	baseRateLimit, rl := newUtilizationTestLimit(t, 100)
+
+	baseRateLimit.GetResponseDescriptorStatus("key", limiter.NewRateLimitInfo(rl, 0, 3, 0, 0), false, 3)
+
+	assert.Equal(t, uint64(3), utilizationCounts(rl)[10])
+}
